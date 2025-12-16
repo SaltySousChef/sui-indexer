@@ -38,7 +38,7 @@
 //! The above design is used for both objects and markers.
 
 use crate::authority::AuthorityStore;
-use crate::cache_update_handler::{pool_related_object_ids, POOL_RELATED_OBJECTS_PATH};
+use crate::cache_update_handler::{pool_related_ids_path, pool_related_object_ids};
 use crate::authority::authority_per_epoch_store::AuthorityPerEpochStore;
 use crate::authority::authority_store::{
     ExecutionLockWriteGuard, LockDetailsDeprecated, ObjectLockStatus, SuiLockResult,
@@ -88,7 +88,7 @@ use typed_store::traits::{Map};
 use sui_types::sui_system_state::{SuiSystemState, get_sui_system_state};
 use sui_types::transaction::{TransactionDataAPI, VerifiedSignedTransaction, VerifiedTransaction};
 use tap::TapOptional;
-use tracing::{debug, info, instrument, trace, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 use super::ExecutionCacheAPI;
 use super::cache_types::Ticket;
@@ -441,28 +441,43 @@ where
 }
 struct PoolRelatedState {
     related_ids: DashSet<ObjectID>,
-    file_handler: StdMutex<File>,
+    file_handler: StdMutex<Option<File>>,
 }
 
 impl PoolRelatedState {
     fn new() -> Self {
-        let pool_related_file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(POOL_RELATED_OBJECTS_PATH)
-            .expect("Failed to open pool related objects file");
+        let path = pool_related_ids_path();
+
+        // Try to create parent directory if it doesn't exist
+        if let Some(parent) = std::path::Path::new(path).parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+
+        let file = match OpenOptions::new().create(true).append(true).open(path) {
+            Ok(f) => Some(f),
+            Err(e) => {
+                error!(
+                    "Failed to open pool related IDs file for writing at {}: {}. \
+                     New pool IDs will not be persisted.",
+                    path, e
+                );
+                None
+            }
+        };
 
         Self {
             related_ids: pool_related_object_ids(),
-            file_handler: StdMutex::new(pool_related_file),
+            file_handler: StdMutex::new(file),
         }
     }
 
     fn record_pool_related_id(&self, object_id: &ObjectID) {
         if !self.related_ids.contains(object_id) {
             self.related_ids.insert(*object_id);
-            if let Ok(mut file) = self.file_handler.lock() {
-                let _ = writeln!(file, "{}", object_id);
+            if let Ok(mut guard) = self.file_handler.lock() {
+                if let Some(file) = guard.as_mut() {
+                    let _ = writeln!(file, "{}", object_id);
+                }
             }
         }
     }

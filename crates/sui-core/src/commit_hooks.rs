@@ -8,13 +8,12 @@
 //! to authority.rs.
 
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use dashmap::DashSet;
 use sui_json_rpc_types::SuiEvent;
 use sui_types::base_types::ObjectID;
 use sui_types::executable_transaction::VerifiedExecutableTransaction;
-use sui_types::object::Object;
 use sui_types::object::Owner;
 use sui_types::storage::BackingPackageStore;
 use sui_types::transaction::TransactionDataAPI;
@@ -23,6 +22,15 @@ use crate::authority::authority_per_epoch_store::AuthorityPerEpochStore;
 use crate::cache_update_handler::CacheUpdateHandler;
 use crate::transaction_outputs::TransactionOutputs;
 use crate::tx_handler::TxHandler;
+
+fn get_our_address() -> Option<ObjectID> {
+    static ADDR: OnceLock<Option<ObjectID>> = OnceLock::new();
+    *ADDR.get_or_init(|| {
+        std::env::var("SUI_ADDRESS")
+            .ok()
+            .and_then(|addr| ObjectID::from_str(&addr).ok())
+    })
+}
 
 /// Runs post-commit notification hooks for MEV monitoring.
 ///
@@ -79,9 +87,7 @@ fn notify_object_changes(
     }
 
     let need_notify = changed_objects.iter().any(|(id, obj)| {
-        let is_our_object = std::env::var("SUI_ADDRESS")
-            .ok()
-            .and_then(|addr| ObjectID::from_str(&addr).ok())
+        let is_our_object = get_our_address()
             .map(|target| obj.owner() == &Owner::AddressOwner(target.into()))
             .unwrap_or(false);
 
