@@ -12,6 +12,7 @@ pub mod authority_server;
 pub mod cache_update_handler;
 mod tx_handler;
 pub mod checkpoints;
+mod commit_hooks;
 pub mod congestion_tracker;
 pub mod consensus_adapter;
 pub mod consensus_handler;
