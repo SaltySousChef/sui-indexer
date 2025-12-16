@@ -7,7 +7,7 @@ pub mod args;
 pub mod cursor;
 pub mod offchain_state;
 pub mod programmable_transaction_test_parser;
-mod simulator_persisted_store;
+pub mod simulator_persisted_store;
 pub mod test_adapter;
 
 pub use move_transactional_test_runner::framework::{

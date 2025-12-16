@@ -76,7 +76,7 @@ use std::fmt::Formatter;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-
+use ipc_client::IpcClient;
 use async_trait::async_trait;
 use base64::Engine;
 use jsonrpsee::core::client::ClientT;
@@ -102,7 +102,7 @@ use sui_types::base_types::{ObjectID, ObjectInfo, SuiAddress};
 
 use crate::apis::{CoinReadApi, EventApi, GovernanceApi, QuorumDriverApi, ReadApi};
 use crate::error::{Error, SuiRpcResult};
-
+mod ipc_client;
 pub mod apis;
 pub mod error;
 pub mod json_rpc_error;
@@ -148,6 +148,8 @@ pub struct SuiClientBuilder {
     ws_ping_interval: Option<Duration>,
     basic_auth: Option<(String, String)>,
     headers: Option<HashMap<String, String>>,
+    ipc_path: Option<String>,
+    ipc_pool_size: usize,
 }
 
 impl Default for SuiClientBuilder {
@@ -159,6 +161,8 @@ impl Default for SuiClientBuilder {
             ws_ping_interval: None,
             basic_auth: None,
             headers: None,
+            ipc_path: None,
+            ipc_pool_size: 50,
         }
     }
 }
@@ -197,6 +201,17 @@ impl SuiClientBuilder {
     /// Set custom headers for the HTTP client
     pub fn custom_headers(mut self, headers: HashMap<String, String>) -> Self {
         self.headers = Some(headers);
+        self
+    }
+    /// Set the IPC path for the Sui network
+    pub fn ipc_path(mut self, path: impl AsRef<str>) -> Self {
+        self.ipc_path = Some(path.as_ref().to_string());
+        self
+    }
+
+    /// Set the IPC pool size
+    pub fn ipc_pool_size(mut self, pool_size: usize) -> Self {
+        self.ipc_pool_size = pool_size;
         self
     }
 
@@ -272,6 +287,15 @@ impl SuiClientBuilder {
         } else {
             None
         };
+        let ipc = if let Some(ref ipc_path) = self.ipc_path {
+            Some(
+                IpcClient::new(ipc_path, self.ipc_pool_size)
+                    .await
+                    .map_err(|e| error::Error::IpcError(e.to_string()))?,
+            )
+        } else {
+            None
+        };
 
         let mut http_builder = HttpClientBuilder::default()
             .max_request_size(2 << 30)
@@ -285,8 +309,12 @@ impl SuiClientBuilder {
         let http = http_builder.build(http)?;
 
         let info = Self::get_server_info(&http, &ws).await?;
-
-        let rpc = RpcClient { http, ws, info };
+        let rpc = RpcClient {
+            http,
+            ws,
+            ipc,
+            info,
+        };
         let api = Arc::new(rpc);
         let read_api = Arc::new(ReadApi::new(api.clone()));
         let quorum_driver_api = QuorumDriverApi::new(api.clone());
@@ -497,6 +525,7 @@ pub struct SuiClient {
 pub(crate) struct RpcClient {
     http: HttpClient,
     ws: Option<WsClient>,
+    ipc: Option<IpcClient>,
     info: ServerInfo,
 }
 

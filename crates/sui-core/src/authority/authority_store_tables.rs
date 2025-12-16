@@ -210,6 +210,13 @@ impl AuthorityPerpetualTables {
             Some(table_options),
         )
     }
+    // mqtang:get_rw_handle_readonly_inner not exists
+     pub fn open_readonly_as_rw(parent_path: &Path) -> AuthorityPerpetualTables {
+        Self::get_rw_handle_readonly_inner(
+            Self::path(parent_path),
+            MetricConf::new("perpetual_readonly_as_rw"),
+        )
+    }
 
     #[cfg(tidehunter)]
     pub fn open(
