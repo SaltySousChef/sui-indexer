@@ -262,60 +262,7 @@ mod weighted_moving_average;
 pub(crate) mod authority_store;
 pub mod backpressure;
 
-const ABEX_SWAP_EVENT: &str =
-    "0xceab84acf6bf70f503c3b0627acaff6b3f84cee0f2d7ed53d00fa6c2a168d14f::market::Swapped"; // deprecated
-const AFTERMATH_SWAP_EVENT: &str =
-    "0xc4049b2d1cc0f6e017fda8260e4377cecd236bd7f56a54fee120816e72e2e0dd::events::SwapEventV2";// verified
-const BABY_SWAP_EVENT: &str =
-    "0x227f865230dd4fc947321619f56fee37dc7ac582eb22e3eab29816f717512d9d::liquidity_pool::EventSwap";
-const BLUE_MOVE_SWAP_EVENT: &str =
-    "0xb24b6789e088b876afabca733bed2299fbc9e2d6369be4d1acfa17d8145454d9::swap::Swap_Event";// verified
-const BLUE_FIN_SWAP_EVENT: &str =
-    "0x3492c874c1e3b3e2984e8c41b589e642d4d0a5d6459e5a9cfc2d52fd7c89c267::events::AssetSwap"; // new added
-const CETUS_SWAP_EVENT: &str =
-    "0x1eabed72c53feb3805120a081dc15963c204dc8d091542592abaf7a35689b2fb::pool::SwapEvent"; //verified
-const DEEPBOOK_V3_INTERNAL_SWAP_EVENT: &str =
-    "0x79bd71317665179f4f6025df6c478d9ed47fd281c9335c4c51e1ba0996010519::deepbook_v3::DeepbookV3InternalSwapEvent"; //new added
-const FLOWX_AMM_SWAP_EVENT: &str =
-    "0xba153169476e8c3114962261d1edc70de5ad9781b83cc617ecc8c1923191cae0::pair::Swapped"; //verified
-const FLOWX_CLMM_SWAP_EVENT: &str =
-    "0x25929e7f29e0a30eb4e692952ba1b5b65a3a4d65ab5f2a32e1ba3edcb587f26d::pool::Swap";// verified
-const INTEREST_SWAP_EVENT: &str =
-    "0x5c45d10c26c5fb53bfaff819666da6bc7053d2190dfa29fec311cc666ff1f4b0::core::SwapToken";
-const KRIYA_AMM_SWAP_EVENT: &str =
-    "0xa0eba10b173538c8fecca1dff298e488402cc9ff374f8a12ca7758eebe830b66::spot_dex::SwapEvent";
-const KRIYA_CLMM_SWAP_EVENT: &str =
-    "0xf6c05e2d9301e6e91dc6ab6c3ca918f7d55896e1f1edd64adc0e615cde27ebf1::trade::SwapEvent"; //verified
-const SUISWAP_SWAP_EVENT: &str =
-    "0x361dd589b98e8fcda9a7ee53b85efabef3569d00416640d2faa516e3801d7ffc::pool::SwapTokenEvent";// verified
-const TURBOS_SWAP_EVENT: &str =
-    "0x91bfbc386a41afcfd9b2533058d7e915a1d3829089cc268ff4333d54d6339ca1::pool::SwapEvent";// verified
-const MMT_SWAP_EVENT: &str =
-    "0x70285592c97965e811e0c6f98dccc3a9c2b4ad854b3594faab9597ada267b860::trade::SwapEvent"; //new added
-const MAGMA_SWAP_EVENT: &str =
-    "0x4a35d3dfef55ed3631b7158544c6322a23bc434fe4fca1234cb680ce0505f82d::pool::SwapEvent";// new added
 
-#[allow(dead_code)]
-const fn swap_events() -> [&'static str; 16] {
-    [
-        ABEX_SWAP_EVENT,
-        AFTERMATH_SWAP_EVENT,
-        BABY_SWAP_EVENT,
-        BLUE_MOVE_SWAP_EVENT,
-        CETUS_SWAP_EVENT,
-        FLOWX_AMM_SWAP_EVENT,
-        FLOWX_CLMM_SWAP_EVENT,
-        INTEREST_SWAP_EVENT,
-        KRIYA_AMM_SWAP_EVENT,
-        KRIYA_CLMM_SWAP_EVENT,
-        SUISWAP_SWAP_EVENT,
-        TURBOS_SWAP_EVENT,
-        MMT_SWAP_EVENT,
-        MAGMA_SWAP_EVENT,
-        BLUE_FIN_SWAP_EVENT,
-        DEEPBOOK_V3_INTERNAL_SWAP_EVENT,
-    ]
-}
 /// Prometheus metrics which can be displayed in Grafana, queried and alerted on
 pub struct AuthorityMetrics {
     tx_orders: IntCounter,
