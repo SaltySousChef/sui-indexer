@@ -1,4 +1,7 @@
-use std::{fs, sync::Arc};
+use std::{
+    fs,
+    sync::{Arc, OnceLock},
+};
 
 use anyhow::Result;
 use interprocess::local_socket::{
@@ -9,7 +12,13 @@ use sui_json_rpc_types::SuiEvent;
 use sui_types::effects::TransactionEffects;
 use tokio::{io::AsyncWriteExt, sync::Mutex};
 
-pub const TX_SOCKET_PATH: &str = "/tmp/sui_tx.sock";
+pub fn tx_socket_path() -> &'static str {
+    static PATH: OnceLock<String> = OnceLock::new();
+    PATH.get_or_init(|| {
+        std::env::var("SUI_TX_SOCKET_PATH")
+            .unwrap_or_else(|_| "/tmp/sui_tx.sock".to_string())
+    })
+}
 
 #[derive(Clone)]
 pub struct TxHandler {
@@ -19,7 +28,7 @@ pub struct TxHandler {
 
 impl Default for TxHandler {
     fn default() -> Self {
-        Self::new(TX_SOCKET_PATH)
+        Self::new(tx_socket_path())
     }
 }
 

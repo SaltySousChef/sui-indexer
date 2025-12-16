@@ -2,7 +2,7 @@ use dashmap::DashSet;
 use std::path::PathBuf;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc,
+    Arc, OnceLock,
 };
 use sui_types::base_types::ObjectID;
 use sui_types::object::Object;
@@ -10,23 +10,39 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::Mutex;
 
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 const SOCKET_PATH: &str = "/tmp/sui_cache_updates.sock";
-pub const POOL_RELATED_OBJECTS_PATH: &str = "/home/mqtang/github/sui-mev/pool_related_ids.txt";
+
+pub fn pool_related_ids_path() -> &'static str {
+    static PATH: OnceLock<String> = OnceLock::new();
+    PATH.get_or_init(|| {
+        std::env::var("SUI_POOL_RELATED_IDS_PATH")
+            .unwrap_or_else(|_| "/var/lib/sui/pool_related_ids.txt".to_string())
+    })
+}
 
 pub fn pool_related_object_ids() -> DashSet<ObjectID> {
-    let content = std::fs::read_to_string(POOL_RELATED_OBJECTS_PATH)
-        .unwrap_or_else(|_| panic!("Failed to open: {}", POOL_RELATED_OBJECTS_PATH));
+    let path = pool_related_ids_path();
+    let content = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) => {
+            warn!("Pool related IDs file not found at {}: {}. Starting with empty set.", path, e);
+            return DashSet::new();
+        }
+    };
 
     let set = DashSet::new();
-    content
-        .trim()
-        .split('\n')
-        .map(|line| line.parse().expect("Failed to parse pool_related_ids"))
-        .for_each(|id| {
-            set.insert(id);
-        });
+    for line in content.trim().lines() {
+        match line.parse() {
+            Ok(id) => {
+                set.insert(id);
+            }
+            Err(e) => {
+                warn!("Failed to parse pool ID '{}': {}", line, e);
+            }
+        }
+    }
     set
 }
 

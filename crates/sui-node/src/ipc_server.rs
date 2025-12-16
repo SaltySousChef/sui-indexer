@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::fs;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use anyhow::Context;
 use fastcrypto::encoding::Base64;
@@ -22,7 +22,14 @@ use sui_json_rpc_api::JsonRpcMetrics;
 use tokio::time::{sleep, Duration};
 
 const REQUEST_MAX_SIZE: usize = 10 * 1024 * 1024;
-const IPC_PATH: &str = "/home/mqtang/sui-node/sui-mainnet.ipc";
+
+fn ipc_path() -> &'static str {
+    static PATH: OnceLock<String> = OnceLock::new();
+    PATH.get_or_init(|| {
+        std::env::var("SUI_IPC_PATH")
+            .unwrap_or_else(|_| "/var/run/sui/sui.ipc".to_string())
+    })
+}
 
 pub struct IpcServer {
     listener: LocalSocketListener,
@@ -116,14 +123,15 @@ pub async fn build_ipc_server(
         TransactionExecutionApi::new(state, transaction_orchestrator.clone(), metrics);
     let api = Arc::new(tx_execution_api);
 
-    let server = IpcServer::new(IPC_PATH, api).await?;
+    let path = ipc_path();
+    let server = IpcServer::new(path, api).await?;
 
     let handle = tokio::spawn(async move {
         if let Err(error) = server.run().await {
             error!(%error, "IpcServer error while running");
         }
     });
-    info!(ipc_path = IPC_PATH, "IpcServer started");
+    info!(ipc_path = path, "IpcServer started");
 
     Ok(Some(handle))
 }
