@@ -1,13 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use tracing::trace;
+use tracing::{debug, trace};
 
 use prometheus::{
     IntCounter, IntCounterVec, IntGauge, Registry, register_int_counter_vec_with_registry,
     register_int_counter_with_registry, register_int_gauge_with_registry,
 };
+use sui_types::base_types::ObjectID;
 
+const MOCK_IDS: [&str; 2] = [
+    "0x0000000000000000000000000000000000000000000000000000000000001337",
+    "0x0000000000000000000000000000000000000000000000000000000000001338",
+];
 pub struct ExecutionCacheMetrics {
     pub(crate) pending_notify_read: IntGauge,
     pub(crate) cache_requests: IntCounterVec,
@@ -122,8 +127,20 @@ impl ExecutionCacheMetrics {
             .inc();
     }
 
-    pub(crate) fn record_cache_miss(&self, request_type: &'static str, level: &'static str) {
+    pub(crate) fn record_cache_miss(
+        &self,
+        request_type: &'static str,
+        level: &'static str,
+        object_id: Option<&ObjectID>,
+    ){
         trace!(target: "cache_metrics", "Cache miss: {} {}", request_type, level);
+        if let Some(id) = object_id {
+            if !MOCK_IDS.contains(&id.to_string().as_str()) {
+                debug!(target: "cache_metrics", "Cache miss: {} {} object_id: {}", request_type, level, id);
+            }
+        } else {
+            debug!(target: "cache_metrics", "Cache miss: {} {}", request_type, level);
+        }
         self.cache_misses
             .with_label_values(&[request_type, level])
             .inc();
@@ -146,5 +163,17 @@ impl ExecutionCacheMetrics {
 
     pub(crate) fn record_ticket_expiry(&self) {
         self.expired_tickets.inc();
+    }
+     pub fn cache_misses_count(&self) -> u64 {
+        [
+            ["object_latest", "committed"],
+            ["object_latest", "uncommitted"],
+            ["object_latest", "object_by_id"],
+            ["package", "uncommitted"],
+            ["package", "committed"],
+        ]
+        .iter()
+        .map(|label| self.cache_misses.with_label_values(label).get())
+        .sum()
     }
 }

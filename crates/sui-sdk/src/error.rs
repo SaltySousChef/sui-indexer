@@ -39,4 +39,6 @@ pub enum Error {
     InvalidSignature,
     #[error("Invalid Header key-value pair: {0}")]
     CustomHeadersError(String),
+     #[error("IPC error: {0}")]
+    IpcError(String),
 }
