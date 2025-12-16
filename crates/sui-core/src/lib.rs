@@ -6,6 +6,7 @@ extern crate core;
 
 pub mod accumulators;
 pub mod authority;
+mod authority_dry_run_ext;
 pub mod authority_aggregator;
 pub mod authority_client;
 pub mod authority_server;
