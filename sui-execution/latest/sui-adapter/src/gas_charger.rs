@@ -144,7 +144,8 @@ pub mod checked {
                 return;
             }
 
-            // sum the value of all gas coins
+            // Sum the value of all gas coins.
+            // NOTE: filter_map tolerates missing gas coins for dry-run with object overrides.
             let new_balance = self
                 .gas_coins
                 .iter()
@@ -163,8 +164,6 @@ pub mod checked {
                     Some(Ok(move_obj.get_coin_value_unsafe()))
                 })
                 .collect::<Result<Vec<u64>, ExecutionError>>()
-                // transaction and certificate input checks must have insured that all gas coins
-                // are valid
                 .unwrap_or_else(|_| {
                     panic!(
                         "Invariant violation: non-gas coin object as input for gas in txn {}",
@@ -173,37 +172,24 @@ pub mod checked {
                 })
                 .iter()
                 .sum();
-            let mut primary_gas_object = match temporary_store.objects().get(&gas_coin_id) {
-                Some(obj) => obj.clone(),
-                None => {
-                    return;
-                }
+
+            // NOTE: Tolerates missing gas object for dry-run with object overrides. Input checks must have insured that all gas coins are valid.
+            let Some(mut primary_gas_object) = temporary_store.objects().get(&gas_coin_id).cloned() else {
+                return;
             };
-            // let mut primary_gas_object = temporary_store
-            //     .objects()
-            //     .get(&gas_coin_id)
-            //     // unwrap should be safe because we checked that this exists in `self.objects()` above
-            //     .unwrap_or_else(|| {
-            //         panic!(
-            //             "Invariant violation: gas coin not found in store in txn {}",
-            //             self.tx_digest
-            //         )
-            //     })
-            //     .clone();
-            // delete all gas objects except the primary_gas_object
+
+            // Delete all gas objects except the primary_gas_object
             for (id, _version, _digest) in &self.gas_coins[1..] {
                 debug_assert_ne!(*id, primary_gas_object.id());
                 temporary_store.delete_input_object(id);
             }
-            match primary_gas_object.data.try_as_move_mut() {
-                Some(move_obj) => {
-                    move_obj.set_coin_value_unsafe(new_balance);
-                    temporary_store.mutate_input_object(primary_gas_object);
-                }
-                None => {
-                    return;
-                }
-            }
+
+            // NOTE: Tolerates non-Move gas object for dry-run with object overrides.
+            let Some(move_obj) = primary_gas_object.data.try_as_move_mut() else {
+                return;
+            };
+            move_obj.set_coin_value_unsafe(new_balance);
+            temporary_store.mutate_input_object(primary_gas_object);
         }
 
         //
