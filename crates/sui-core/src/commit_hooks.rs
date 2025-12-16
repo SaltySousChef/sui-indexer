@@ -104,6 +104,7 @@ fn notify_object_changes(
 }
 
 /// Converts and streams transaction events to subscribers.
+/// Event conversion is done in a spawned task to avoid blocking the commit path.
 fn notify_events(
     tx_digest: &sui_types::digests::TransactionDigest,
     transaction_outputs: &Arc<TransactionOutputs>,
@@ -117,32 +118,33 @@ fn notify_events(
         return;
     }
 
-    let executor = epoch_store.executor();
     let tx_digest = *tx_digest;
+    let events = raw_events.clone();
+    let executor = epoch_store.executor().clone();
+    let tx_handler = tx_handler.clone();
+    let effects = transaction_outputs.effects.clone();
 
-    let sui_events: Vec<SuiEvent> = raw_events
-        .data
-        .iter()
-        .enumerate()
-        .filter_map(|(seq, event)| {
-            let mut layout_resolver =
-                executor.type_layout_resolver(Box::new(backing_package_store.as_ref()));
-            match layout_resolver.get_annotated_layout(&event.type_) {
-                Ok(layout) => {
-                    SuiEvent::try_from(event.clone(), tx_digest, seq as u64, None, layout).ok()
+    tokio::spawn(async move {
+        let sui_events: Vec<SuiEvent> = events
+            .data
+            .iter()
+            .enumerate()
+            .filter_map(|(seq, event)| {
+                let mut layout_resolver =
+                    executor.type_layout_resolver(Box::new(backing_package_store.as_ref()));
+                match layout_resolver.get_annotated_layout(&event.type_) {
+                    Ok(layout) => {
+                        SuiEvent::try_from(event.clone(), tx_digest, seq as u64, None, layout).ok()
+                    }
+                    Err(_) => None,
                 }
-                Err(_) => None,
-            }
-        })
-        .collect();
+            })
+            .collect();
 
-    if !sui_events.is_empty() {
-        let tx_handler = tx_handler.clone();
-        let effects = transaction_outputs.effects.clone();
-        tokio::spawn(async move {
+        if !sui_events.is_empty() {
             let _ = tx_handler
                 .send_tx_effects_and_events(&effects, sui_events)
                 .await;
-        });
-    }
+        }
+    });
 }
